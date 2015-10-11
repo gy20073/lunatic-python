@@ -1,0 +1,3 @@
+
+# Torch install folder
+torch_install = "/home/user/torch"

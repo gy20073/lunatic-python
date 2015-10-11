@@ -1,7 +1,7 @@
 #!/usr/bin/python
-
 import sys
 import os
+import settings
 
 if sys.version > '3':
     PY3 = True
@@ -56,8 +56,33 @@ def pkgconfig(*packages):
 
     return kwargs
 
-lua_pkgconfig = pkgconfig('lua' + LUAVERSION, 'lua' + LUAVERSION,'python-' + PYTHONVERSION)
+lua_pkgconfig = pkgconfig('luajit', 'lua' + LUAVERSION,'python-' + PYTHONVERSION)
 lua_pkgconfig['extra_compile_args'] = ['-I/usr/include/lua'+LUAVERSION]
+
+
+source = ["src/luainpython.cpp",
+          "fblualib-src/LuaUtils.cpp",
+          "fblualib-src/LuaToPython.cpp",
+          "fblualib-src/Utils.cpp",
+          "fblualib-src/Debug.cpp",
+          "fblualib-src/Ref.cpp",
+          "fblualib-src/Storage.cpp",
+          "src/pythoninlua.cpp",
+          "fblualib-src/NumpyArrayAllocator.cpp"]
+
+module_lua = Extension("lua",
+              source,
+              **lua_pkgconfig)
+
+include_dirs = ['./include',
+                './fblualib-include',
+                settings.torch_install+'/install/include',
+                settings.torch_install+'/install/include/TH']
+
+for d in include_dirs:
+  module_lua.include_dirs.append(d)
+
+module_lua.extra_compile_args.append('-std=c++11')
 
 setup(name="lunatic-python",
       version="1.0",
@@ -73,11 +98,6 @@ Python, Python inside Lua, Lua inside Python inside Lua, Python inside Lua
 inside Python, and so on.
 """,
       ext_modules=[
-        Extension("lua-python",
-                  ["src/pythoninlua.c", "src/luainpython.c"],
-                  **lua_pkgconfig),
-        Extension("lua",
-                  ["src/pythoninlua.c", "src/luainpython.c"],
-                  **lua_pkgconfig),
+        module_lua,
         ],
       )

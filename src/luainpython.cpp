@@ -20,22 +20,61 @@
  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
+#include <dlfcn.h>
 #include <Python.h>
 
 /* need this to build with Lua 5.2: enables lua_strlen() macro */
 #define LUA_COMPAT_ALL
 
+extern "C" {
 #include <lua.h>
 #include <luaconf.h>
 #include <lauxlib.h>
 #include <lualib.h>
+}
 
 #include "pythoninlua.h"
 #include "luainpython.h"
+#include "LuaUtils.h"
+#include "LuaToPython.h"
+#include "Ref.h"
+
+using namespace fblualib;
+using namespace fblualib::python;
 
 lua_State *LuaState = NULL;
 
 static PyObject *LuaObject_New(int n);
+
+#include "stdio.h"
+/*static void stackDump (lua_State *L) {
+  int i;
+  int top = lua_gettop(L);
+  for (i = 0; i <= top; i++) {  // repeat for each level
+    int t = lua_type(L, i);
+    switch (t) {
+
+      case LUA_TSTRING:  // strings
+        printf("`%s'", lua_tostring(L, i));
+        break;
+
+      case LUA_TBOOLEAN:  // booleans
+        printf(lua_toboolean(L, i) ? "true" : "false");
+        break;
+
+      case LUA_TNUMBER:  // numbers
+        printf("%g", lua_tonumber(L, i));
+        break;
+
+      default:  // other values
+        printf("%s", lua_typename(L, t));
+        break;
+
+    }
+    printf("  ");  // put a separator
+  }
+  printf("\n");  // end the listing
+}*/
 
 PyObject *LuaConvert(lua_State *L, int n)
 {
@@ -77,6 +116,26 @@ PyObject *LuaConvert(lua_State *L, int n)
             break;
 
         case LUA_TUSERDATA: {
+
+            // Handle torch tensor and convert them to numpy array
+            LuaToPythonConverter converter;
+#define TENSOR_TO_NDARRAY(TYPE, NUMPY_TYPE) \
+            { \
+              auto tensor = luaGetTensor<TYPE>(L, n); \
+              if (tensor) { \
+                ret = converter.convertTensor<TYPE>(L, *tensor, NUMPY_TYPE).release(); \
+                break; \
+              } \
+            }
+            TENSOR_TO_NDARRAY(double, NPY_DOUBLE);
+            TENSOR_TO_NDARRAY(float, NPY_FLOAT);
+            TENSOR_TO_NDARRAY(int32_t, NPY_INT32);
+            TENSOR_TO_NDARRAY(int64_t, NPY_INT64);
+            TENSOR_TO_NDARRAY(uint8_t, NPY_UINT8);
+#undef TENSOR_TO_NDARRAY
+
+
+            // If not a tensor, create a generic python object
             py_object *obj = luaPy_to_pobject(L, n);
 
             if (obj) {
@@ -169,6 +228,32 @@ static PyObject *LuaCall(lua_State *L, PyObject *args)
     lua_settop(L, 0);
 
     return ret;
+}
+
+PyObject* convertDictFromTable(lua_State* L, int index)
+{
+    if (lua_type(L, index) != LUA_TTABLE) {
+    luaL_error(L, "must be table");
+    }
+    PyObject *obj = PyDict_New();
+    Py_INCREF(obj);
+    checkPythonError(obj, L, "convertDictFromTable");
+
+    lua_pushnil(L);
+    while (lua_next(L, index) != 0) {
+        // key at index -2, value at index -1
+        // Python can't use arbitrary types as dict keys; only allow numbers
+        // and strings. Also, if you use float keys, you're insane.
+        auto key = LuaConvert(L, -2);
+
+        auto value = LuaConvert(L, -1);
+        if (value) {
+          PyDict_SetItem(obj, key, value);
+        }
+        lua_pop(L, 1);  // keep key for next iteration
+    }
+
+    return obj;
 }
 
 static PyObject *LuaObject_New(int n)
@@ -489,38 +574,103 @@ static PyObject *Lua_require(PyObject *self, PyObject *args)
     return LuaCall(LuaState, args);
 }
 
+static PyObject *Lua_to_dict(PyObject *self, PyObject *args)
+{
+    if (!PyTuple_Check(args)) {
+        PyErr_SetString(PyExc_TypeError, "tuple expected");
+        lua_settop(LuaState, 0);
+        return NULL;
+    }
+
+    PyObject *obj = PyTuple_GetItem(args, 0);
+    if(LuaObject_Check(obj)) {
+        lua_rawgeti(LuaState, LUA_REGISTRYINDEX, ((LuaObject*)obj)->ref);
+        return convertDictFromTable(LuaState, 1);
+    }
+
+    PyErr_SetString(PyExc_TypeError, "LuaObject expected");
+    lua_settop(LuaState, 0);
+    return NULL;
+}
+
+static PyObject *Lua_to_table(PyObject *self, PyObject *args)
+{
+    if (!PyTuple_Check(args)) {
+        PyErr_SetString(PyExc_TypeError, "tuple expected");
+        lua_settop(LuaState, 0);
+        return NULL;
+    }
+    PyObject *obj = PyTuple_GetItem(args, 0);
+
+    if (PyDict_Check(obj)) {
+        lua_newtable(LuaState);
+        Py_ssize_t pos = 0;
+        PyObject* keyObj = nullptr;
+        PyObject* valueObj = nullptr;
+
+        // key, value are borrowed
+        while (PyDict_Next(obj, &pos, &keyObj, &valueObj)) {
+            checkPythonError(keyObj, LuaState, "retrieve dictionary key");
+            checkPythonError(valueObj, LuaState, "retrieve dictionary value");
+            PyObjectHandle key(PyObjectHandle::INCREF, keyObj);
+            PyObjectHandle value(PyObjectHandle::INCREF, valueObj);
+
+            py_convert(LuaState, key.get(), false);
+            py_convert(LuaState, value.get(), false);
+
+            lua_rawset(LuaState, -3);
+        }
+
+        return LuaConvert(LuaState, -1);
+    }
+
+    PyErr_SetString(PyExc_TypeError, "dictionary expected");
+    lua_settop(LuaState, 0);
+    return NULL;
+}
+
 static PyMethodDef lua_methods[] = {
     {"execute",    Lua_execute,    METH_VARARGS,        NULL},
     {"eval",       Lua_eval,       METH_VARARGS,        NULL},
     {"globals",    Lua_globals,    METH_NOARGS,         NULL},
     {"require",    Lua_require,    METH_VARARGS,        NULL},
+    {"toDict",     Lua_to_dict,    METH_VARARGS,        NULL},
+    {"toTable",    Lua_to_table,   METH_VARARGS,        NULL},
     {NULL,         NULL}
 };
 
-#if PY_MAJOR_VERSION >= 3
-static struct PyModuleDef lua_module = {
-    PyModuleDef_HEAD_INIT,
-    "lua",
-    "Lunatic-Python Python-Lua bridge",
-    -1,
-    lua_methods
-};
-#endif
+PyMODINIT_FUNC PyInit_lua(void);
+
+// This module loads libpython.so, which needs to be made available for
+// resolution to numpy's internal modules (multiarray.so does not have a
+// DT_NEEDED dependency on libpython.so). The trouble is that LuaJIT loads C
+// extensions with RTLD_LOCAL and there's no easy way to override that, so
+// symbols from this module (and its dependencies) are not available to
+// numpy's internal modules.
+//
+// We fix this by reloading the current module with RTLD_GLOBAL. Note the
+// RTLD_NOLOAD flag; we'll fail if the library isn't already loaded (which
+// would mean we're doing something stupid).
+void reloadGlobal() {
+  Dl_info info;
+  // Yes, dladdr returns non-zero on success...
+  CHECK_NE(dladdr(reinterpret_cast<void*>(&PyInit_lua), &info), 0);
+  CHECK(info.dli_fname);
+  void* self = dlopen(info.dli_fname, RTLD_LAZY | RTLD_NOLOAD | RTLD_GLOBAL);
+  CHECK(self);
+  // ... but dlclose returns zero on success.
+  CHECK_EQ(dlclose(self), 0);  // release this new reference
+}
 
 PyMODINIT_FUNC PyInit_lua(void)
 {
+    reloadGlobal();
+
     PyObject *m;
 
-#if PY_MAJOR_VERSION >= 3
-    if (PyType_Ready(&LuaObject_Type) < 0) return NULL;
-    m = PyModule_Create(&lua_module);
-    if (m == NULL) return NULL;
-#else
     if (PyType_Ready(&LuaObject_Type) < 0) return;
-    m = Py_InitModule3("lua", lua_methods,
-                       "Lunatic-Python Python-Lua bridge");
+    m = Py_InitModule("lua", lua_methods);
     if (m == NULL) return;
-#endif
 
     Py_INCREF(&LuaObject_Type);
 
@@ -529,9 +679,11 @@ PyMODINIT_FUNC PyInit_lua(void)
         luaL_openlibs(LuaState);
         luaopen_python(LuaState);
         lua_settop(LuaState, 0);
-    }
 
-#if PY_MAJOR_VERSION >= 3
-    return m;
-#endif
+        lua_newtable(LuaState);
+
+        initRef(LuaState);
+        initLuaToPython(LuaState);
+        initpythoninlua(LuaState);
+    }
 }
