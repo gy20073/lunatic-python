@@ -25,11 +25,57 @@
 /* need this to build with Lua 5.2: defines luaL_register() macro */
 #define LUA_COMPAT_MODULE
 
+extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
+}
 
 #include "pythoninlua.h"
 #include "luainpython.h"
+
+#include "NumpyArrayAllocator.h"
+#include "Utils.h"
+
+using namespace fblualib;
+using namespace fblualib::python;
+
+namespace {
+    template <class T>
+    void pushTensor(lua_State* L, const PyObjectHandle& oh) {
+      auto arr = reinterpret_cast<PyArrayObject*>(oh.get());
+      auto storage = thpp::Storage<T>::wrapWithAllocator(
+          folly::Range<T*>(static_cast<T*>(PyArray_DATA(arr)),
+                           PyArray_NBYTES(arr) / sizeof(T)),
+          &thpp::THAllocatorWrapper<NumpyArrayAllocator>::thAllocator,
+          new NumpyArrayAllocator(oh));
+
+      // Numpy and Torch disagree on empty tensors. In Torch, an empty
+      // tensor is a tensor with zero dimensions. In Numpy, an empty tensor
+      // keeps its shape, but has 0 as the size of one of the dimensions.
+      // So we'll convert all Numpy tensors of 0 elements to empty Torch tensors.
+      // Also see LuaToPythonConverter::convertTensor in LuaToPython.cpp.
+      if (PyArray_SIZE(arr) != 0) {
+        auto ndims = PyArray_NDIM(arr);
+        thpp::LongStorage sizes(ndims, 0L);
+        for (size_t i = 0; i < ndims; ++i) {
+          sizes[i] = PyArray_DIM(arr, i);
+        }
+
+        thpp::LongStorage strides(ndims, 0L);
+        for (size_t i = 0; i < ndims; ++i) {
+          long s = PyArray_STRIDE(arr, i);
+          DCHECK_EQ(s % sizeof(T), 0);  // must be aligned
+          strides[i] = s / sizeof(T);   // numpy uses bytes, torch uses elements
+        }
+
+        thpp::Tensor<T> tensor(std::move(storage), 0, std::move(sizes),
+                               std::move(strides));
+        luaPushTensor(L, std::move(tensor));
+      } else {
+        luaPushTensor(L, thpp::Tensor<T>());
+      }
+    }
+}
 
 static int py_asfunc_call(lua_State *L);
 
@@ -73,23 +119,27 @@ int py_convert(lua_State *L, PyObject *o, int withnone)
     } else if (o == Py_False) {
         lua_pushboolean(L, 0);
         ret = 1;
-#if PY_MAJOR_VERSION >= 3
-    } else if (PyUnicode_Check(o)) {
-        Py_ssize_t len;
-        char *s = PyUnicode_AsUTF8AndSize(o, &len);
-#else
     } else if (PyString_Check(o)) {
         Py_ssize_t len;
         char *s;
         PyString_AsStringAndSize(o, &s, &len);
-#endif
         lua_pushlstring(L, s, len);
         ret = 1;
-#if PY_MAJOR_VERSION < 3
+    } else if (PyBytes_Check(o)) {
+        char* data = PyString_AS_STRING(o);
+        Py_ssize_t len = PyString_GET_SIZE(o);
+        lua_pushlstring(L, data, len);
+        ret = 1;
+    } else if (PyUnicode_Check(o)) {
+        PyObjectHandle str(PyUnicode_AsUTF8String(o));
+        checkPythonError(str, L, "convert unicode");
+        char* data = PyString_AS_STRING(str.get());
+        Py_ssize_t len = PyString_GET_SIZE(str.get());
+        lua_pushlstring(L, data, len);
+        ret = 1;
     } else if (PyInt_Check(o)) {
         lua_pushnumber(L, (lua_Number)PyInt_AsLong(o));
         ret = 1;
-#endif
     } else if (PyLong_Check(o)) {
         lua_pushnumber(L, (lua_Number)PyLong_AsLong(o));
         ret = 1;
@@ -99,17 +149,40 @@ int py_convert(lua_State *L, PyObject *o, int withnone)
     } else if (LuaObject_Check(o)) {
         lua_rawgeti(L, LUA_REGISTRYINDEX, ((LuaObject*)o)->ref);
         ret = 1;
-    } else {
-        int asindx = 0;
-        if (PyDict_Check(o) || PyList_Check(o) || PyTuple_Check(o))
-            asindx = 1;
-        ret = py_convert_custom(L, o, asindx);
-        if (ret && !asindx &&
-            (PyFunction_Check(o) || PyCFunction_Check(o)))
-            lua_pushcclosure(L, py_asfunc_call, 1);
+    } else if (PyArray_Check(o)) {                // numpy.ndarray
+        PyObjectHandle arr(PyArray_FromArray(
+            reinterpret_cast<PyArrayObject*>(o),
+            nullptr,
+            NPY_ARRAY_BEHAVED));  // properly aligned and writable
+        checkPythonError(arr, L, "get well-behaved numpy array");
+        PyArrayObject* arrObj = reinterpret_cast<PyArrayObject*>(arr.get());
+
+#define NDARRAY_TO_TENSOR(TYPE, NUMPY_TYPE) \
+        case NUMPY_TYPE: \
+          pushTensor<TYPE>(L, PyObjectHandle(o)); \
+          ret = 1; \
+          break
+
+        switch (PyArray_TYPE(arrObj)) {
+        NDARRAY_TO_TENSOR(double, NPY_DOUBLE);
+        NDARRAY_TO_TENSOR(float, NPY_FLOAT);
+        NDARRAY_TO_TENSOR(int32_t, NPY_INT32);
+        NDARRAY_TO_TENSOR(int64_t, NPY_INT64);
+        NDARRAY_TO_TENSOR(uint8_t, NPY_UINT8);
+        default:
+          luaL_error(L, "Invalid numpy data type %d", PyArray_TYPE(arrObj));
+        }
+        } else {
+            int asindx = 0;
+            if (PyDict_Check(o) || PyList_Check(o) || PyTuple_Check(o))
+                asindx = 1;
+            ret = py_convert_custom(L, o, asindx);
+            if (ret && !asindx &&
+                (PyFunction_Check(o) || PyCFunction_Check(o)))
+                lua_pushcclosure(L, py_asfunc_call, 1);
+        }
+        return ret;
     }
-    return ret;
-}
 
 static int py_object_call(lua_State *L)
 {
@@ -610,4 +683,10 @@ LUA_API int luaopen_python(lua_State *L)
     }
 
     return 0;
+}
+
+int initpythoninlua(lua_State* L) {
+  initNumpy(L);
+  initNumpyArrayAllocator(L);
+  return 0;
 }
