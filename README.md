@@ -13,7 +13,7 @@ To install you will need some external libraries before using the setup.py scrip
 You need to install [torch](http://torch.ch/docs/getting-started.html#_) and numpy of course, then:
 
 ##### Ubuntu 14.04
-If you use Ubuntu 14.04 you can use the 'install.sh' script to install all dependecies and the 'lua' package (tested on a vanilla install just after torch install).
+If you use Ubuntu 14.04 you can use the `install.sh` script to install all dependecies and the `lua` package (tested on a vanilla install just after torch install).
 
 ##### Others
 Otherwise, you need to install:
@@ -51,18 +51,3 @@ The module is composed of a basic interface:
 * get and set attributes if the underlying lua object supports it
 * you can iterate on it if the underlying lua object supports it (tables)
 * you can use the `lua.toDict()` and `lua.toTable()` functions to change between a python dictionnary and a lua table (that is handled as a LuaObject)
-
-
-#### TODO
-
-* Preload properly all the '.so'
-* Try to use directly the TH API to handle Tensors to remove dependencies on folly, thrift and thpp.
-
-#### Notes
-
-For the first point of the TODO, maybe create a two level library similar to what is done by [lupa](https://github.com/scoder/lupa/blob/master/lupa/__init__.py)
-
-For the fblualib dependency, all the corresponding source and headers are in the `fblualib-*` folders. What we use from this source is:
-* `PyObjectHandle` from `Utils.h`. This is just a wrapper over `PyObject`s this can be removed with some extra `Py_INCREF` calls.
-* `LuaToPythonConverter` class from `LuaToPython.h`. In practice, the only thing used in this class is the `convertTensor` function used to create a numpy array from a Torch tensor.
-* `NumpyArrayAllocator` and the corresponding `thpp` calls made in the `pushTensor` function in `pythoninlua.cpp`. This is the function creating a Torch tensor from a numpy array.
