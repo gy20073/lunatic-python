@@ -33,6 +33,10 @@
 #include "pythoninlua.h"
 #include "luainpython.h"
 
+// Torch related includes
+#include "TH/TH.h"
+#include "luaT.h"
+
 lua_State *LuaState = NULL;
 
 static PyObject *LuaObject_New(int n);
@@ -77,6 +81,27 @@ PyObject *LuaConvert(lua_State *L, int n)
             break;
 
         case LUA_TUSERDATA: {
+
+
+            // Handle torch tensor and convert them to numpy array
+#define TENSOR_TO_NDARRAY(TYPE, NUMPY_TYPE) \
+            { \
+              TH ## TYPE ## Tensor *tensor = luaT_toudata(L, n, "torch." #TYPE "Tensor"); \
+              if (tensor) { \
+                ret = createNumpyArray(tensor, NUMPY_TYPE); \
+                break; \
+              } \
+            }
+            TENSOR_TO_NDARRAY(Double, NPY_DOUBLE);
+            TENSOR_TO_NDARRAY(Float, NPY_FLOAT);
+            TENSOR_TO_NDARRAY(Int, NPY_INT32);
+            TENSOR_TO_NDARRAY(Long, NPY_INT64);
+            TENSOR_TO_NDARRAY(Byte, NPY_UINT8);
+#undef TENSOR_TO_NDARRAY
+
+
+            // If not a tensor, create a generic python object
+
             py_object *obj = luaPy_to_pobject(L, n);
 
             if (obj) {

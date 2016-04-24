@@ -61,6 +61,8 @@ lua_pkgconfig = pkgconfig('lua' + LUAVERSION, 'lua' + LUAVERSION,'python-' + PYT
 lua_pkgconfig['include_dirs'] += [TORCHDIR+'/include']
 lua_pkgconfig['library_dirs'] = [TORCHDIR+'/lib']
 lua_pkgconfig['libraries'] += ['luajit']
+lua_pkgconfig['libraries'] += ['TH']
+lua_pkgconfig['libraries'] += ['luaT']
 
 setup(name="lunatic-python",
       version="1.0",
