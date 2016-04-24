@@ -25,6 +25,7 @@ PYLIBS = ["python" + get_python_version(), "pthread", "util"]
 PYLIBDIR = [get_python_lib(standard_lib=True) + "/config"]
 LUALIBS = ["lua" + LUAVERSION]
 LUALIBDIR = []
+TORCHDIR = "/home/alban/torch/install"
 
 def pkgconfig(*packages):
     # map pkg-config output to kwargs for distutils.core.Extension
@@ -57,7 +58,9 @@ def pkgconfig(*packages):
     return kwargs
 
 lua_pkgconfig = pkgconfig('lua' + LUAVERSION, 'lua' + LUAVERSION,'python-' + PYTHONVERSION)
-lua_pkgconfig['extra_compile_args'] = ['-I/usr/include/lua'+LUAVERSION]
+lua_pkgconfig['include_dirs'] += [TORCHDIR+'/include']
+lua_pkgconfig['library_dirs'] = [TORCHDIR+'/lib']
+lua_pkgconfig['libraries'] += ['luajit']
 
 setup(name="lunatic-python",
       version="1.0",
