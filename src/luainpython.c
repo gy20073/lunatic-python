@@ -171,6 +171,34 @@ static PyObject *LuaCall(lua_State *L, PyObject *args)
     return ret;
 }
 
+PyObject* convertDictFromTable(lua_State* L, int index)
+{
+    if (lua_type(L, index) != LUA_TTABLE) {
+        luaL_error(L, "must be table");
+    }
+    PyObject *obj = PyDict_New();
+    if(!obj) {
+        luaL_error(L, "convertDictFromTable");
+    }
+    Py_INCREF(obj);
+
+    lua_pushnil(L);
+    while (lua_next(L, index) != 0) {
+        // key at index -2, value at index -1
+        // Python can't use arbitrary types as dict keys; only allow numbers
+        // and strings. Also, if you use float keys, you're insane.
+        PyObject *key = LuaConvert(L, -2);
+
+        PyObject *value = LuaConvert(L, -1);
+        if (value) {
+          PyDict_SetItem(obj, key, value);
+        }
+        lua_pop(L, 1);  // keep key for next iteration
+    }
+
+    return obj;
+}
+
 static PyObject *LuaObject_New(int n)
 {
     LuaObject *obj = PyObject_New(LuaObject, &LuaObject_Type);
@@ -489,11 +517,72 @@ static PyObject *Lua_require(PyObject *self, PyObject *args)
     return LuaCall(LuaState, args);
 }
 
+static PyObject *Lua_to_dict(PyObject *self, PyObject *args)
+{
+    if (!PyTuple_Check(args)) {
+        PyErr_SetString(PyExc_TypeError, "tuple expected");
+        lua_settop(LuaState, 0);
+        return NULL;
+    }
+
+    PyObject *obj = PyTuple_GetItem(args, 0);
+    if(LuaObject_Check(obj)) {
+        lua_rawgeti(LuaState, LUA_REGISTRYINDEX, ((LuaObject*)obj)->ref);
+        return convertDictFromTable(LuaState, 1);
+    }
+
+    PyErr_SetString(PyExc_TypeError, "LuaObject expected");
+    lua_settop(LuaState, 0);
+    return NULL;
+}
+
+static PyObject *Lua_to_table(PyObject *self, PyObject *args)
+{
+    if (!PyTuple_Check(args)) {
+        PyErr_SetString(PyExc_TypeError, "tuple expected");
+        lua_settop(LuaState, 0);
+        return NULL;
+    }
+    PyObject *obj = PyTuple_GetItem(args, 0);
+
+    if (PyDict_Check(obj)) {
+        lua_newtable(LuaState);
+        Py_ssize_t pos = 0;
+        PyObject* key = NULL;
+        PyObject* value = NULL;
+
+        // key, value are borrowed
+        while (PyDict_Next(obj, &pos, &key, &value)) {
+            if (!key) {
+                luaL_error(LuaState, "retrieve dictionary key");
+            }
+            if (!value) {
+                luaL_error(LuaState, "retrieve dictionary value");
+            }
+            Py_INCREF(key);
+            Py_INCREF(value);
+
+            py_convert(LuaState, key, 0);
+            py_convert(LuaState, value, 0);
+
+            lua_rawset(LuaState, -3);
+        }
+
+        return LuaConvert(LuaState, -1);
+    }
+
+    PyErr_SetString(PyExc_TypeError, "dictionary expected");
+    lua_settop(LuaState, 0);
+    return NULL;
+}
+
 static PyMethodDef lua_methods[] = {
     {"execute",    Lua_execute,    METH_VARARGS,        NULL},
     {"eval",       Lua_eval,       METH_VARARGS,        NULL},
     {"globals",    Lua_globals,    METH_NOARGS,         NULL},
     {"require",    Lua_require,    METH_VARARGS,        NULL},
+    {"toDict",     Lua_to_dict,    METH_VARARGS,        NULL},
+    {"toTable",    Lua_to_table,   METH_VARARGS,        NULL},
     {NULL,         NULL}
 };
 
