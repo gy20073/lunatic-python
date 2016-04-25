@@ -27,3 +27,16 @@ try:
 except:
     print "lua.require('foo') raised an exception"
 
+print """----- pythonDict = {"coucou": 1, "truc": 2} -----"""
+pythonDict = {"coucou": 1, "truc": 2}
+print(pythonDict)
+print "----- luaTable = lua.toTable(pythonDict) -----"
+luaTable = lua.toTable(pythonDict)
+print(luaTable)
+print "----- lg.luaTable = luaTable -----"
+lg.luaTable = luaTable
+print '----- lua.execute("""for u,v in pairs(luaTable) do print("key: "..u.."/val: "..v) end""") -----'
+lua.execute("""for u,v in pairs(luaTable) do print("key: '"..u.."' val: '"..v.."'") end""")
+print "----- pythonDict = lua.toDict(lg.luaTable) -----"
+pythonDict = lua.toDict(lg.luaTable)
+print(pythonDict)
