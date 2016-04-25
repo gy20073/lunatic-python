@@ -1,5 +1,6 @@
 print "----- import lua -----"
 import lua
+import numpy as np
 print "----- lg = lua.globals() -----"
 lg = lua.globals()
 print "lg:", lg
@@ -40,3 +41,33 @@ lua.execute("""for u,v in pairs(luaTable) do print("key: '"..u.."' val: '"..v.."
 print "----- pythonDict = lua.toDict(lg.luaTable) -----"
 pythonDict = lua.toDict(lg.luaTable)
 print(pythonDict)
+
+print "----- torch set default tensor -----"
+lua.execute('torch.setdefaulttensortype("torch.FloatTensor")')
+print "----- lua.execute('tensor = torch.rand(2,3)') -----"
+lua.execute('tensor = torch.rand(2,3)')
+print "----- print lg.tensor.shape -----"
+print lg.tensor.shape
+print "----- print lg.tensor -----"
+print lg.tensor
+print "----- lua.execute('tensor[1][1] = 10') -----"
+lua.execute('tensor[1][1] = 10')
+print "----- print lg.tensor -----"
+print lg.tensor
+print "----- lua.execute('print(tensor)') -----"
+lua.execute('print(tensor)')
+
+print "----- nparray = np.random.rand(3,4) -----"
+nparray = np.random.rand(3,4)
+print "----- print nparray.shape -----"
+print nparray.shape
+print "----- print nparray -----"
+print nparray
+print "----- lg.nparray = nparray -----"
+lg.nparray = nparray
+print "----- lua.execute('print(nparray:size())') -----"
+lua.execute('print(nparray:size())')
+print "----- lua.execute('print(nparray)') -----"
+lua.execute('print(nparray)')
+
+print "----- finished -----"

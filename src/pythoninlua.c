@@ -31,6 +31,15 @@
 #include "pythoninlua.h"
 #include "luainpython.h"
 
+// Torch related includes
+#include "luaT.h"
+#include "TH.h"
+#include "THStorage.h"
+
+// Numpy related includes
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <numpy/arrayobject.h>
+
 static int py_asfunc_call(lua_State *L);
 
 static int py_convert_custom(lua_State *L, PyObject *o, int asindx)
@@ -99,6 +108,14 @@ int py_convert(lua_State *L, PyObject *o, int withnone)
     } else if (LuaObject_Check(o)) {
         lua_rawgeti(L, LUA_REGISTRYINDEX, ((LuaObject*)o)->ref);
         ret = 1;
+    } else if (PyArray_Check(o)) {
+        PyArrayObject *arrObj = (PyArrayObject *)PyArray_FromArray((PyArrayObject *)o, NULL, NPY_ARRAY_BEHAVED);
+        switch (PyArray_TYPE(arrObj)) {
+            #define TH_GENERIC_FILE "generic/arrayToTensor.c"
+            #include "THGenerateAllTypes.h"
+            default:
+                luaL_error(L, "Invalid numpy data type %d", PyArray_TYPE(arrObj));
+        }
     } else {
         int asindx = 0;
         if (PyDict_Check(o) || PyList_Check(o) || PyTuple_Check(o))
@@ -553,8 +570,15 @@ static const luaL_Reg py_lib[] = {
     {NULL, NULL}
 };
 
+void initNumpy(void) {
+    import_array();
+}
+
 LUA_API int luaopen_python(lua_State *L)
 {
+    // import_array cannot be called here because it return nothing on error
+    // and this function is supposed to return an int
+    initNumpy();
     int rc;
 
     /* Register module */

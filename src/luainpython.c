@@ -39,6 +39,10 @@
 #include "luaT.h"
 #include "TH.h"
 
+// Numpy related includes
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <numpy/arrayobject.h>
+
 lua_State *LuaState = NULL;
 
 static PyObject *LuaObject_New(int n);
@@ -84,28 +88,12 @@ PyObject *LuaConvert(lua_State *L, int n)
 
         case LUA_TUSERDATA: {
 
-
             // Handle torch tensor and convert them to numpy array
-#define TENSOR_TO_NDARRAY(TYPE, NUMPY_TYPE) \
-            { \
-              TH ## TYPE ## Tensor *tensor = luaT_toudata(L, n, "torch." #TYPE "Tensor"); \
-              if (tensor) { \
-                ret = createNumpyArray(tensor, NUMPY_TYPE); \
-                break; \
-              } \
-            }
-            TENSOR_TO_NDARRAY(Double, NPY_DOUBLE);
-            TENSOR_TO_NDARRAY(Float, NPY_FLOAT);
-            TENSOR_TO_NDARRAY(Int, NPY_INT32);
-            TENSOR_TO_NDARRAY(Long, NPY_INT64);
-            TENSOR_TO_NDARRAY(Byte, NPY_UINT8);
-#undef TENSOR_TO_NDARRAY
+            #define TH_GENERIC_FILE "generic/tensorToArray.c"
+            #include "THGenerateAllTypes.h"
 
-
-            // If not a tensor, create a generic python object
-
+            // If not a tensor, is it a pobject that we created in pythoninlua
             py_object *obj = luaPy_to_pobject(L, n);
-
             if (obj) {
                 Py_INCREF(obj->o);
                 ret = obj->o;
@@ -659,6 +647,7 @@ PyMODINIT_FUNC PyInit_lua(void)
     reloadGlobal();
 
     PyObject *m;
+    import_array();
 
 #if PY_MAJOR_VERSION >= 3
     if (PyType_Ready(&LuaObject_Type) < 0) return NULL;
