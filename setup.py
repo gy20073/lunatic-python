@@ -59,6 +59,7 @@ def pkgconfig(*packages):
 
 lua_pkgconfig = pkgconfig('lua' + LUAVERSION, 'lua' + LUAVERSION,'python-' + PYTHONVERSION)
 lua_pkgconfig['include_dirs'] += [TORCHDIR+'/include']
+lua_pkgconfig['include_dirs'] += [TORCHDIR+'/include/TH']
 lua_pkgconfig['library_dirs'] = [TORCHDIR+'/lib']
 lua_pkgconfig['libraries'] += ['luajit']
 lua_pkgconfig['libraries'] += ['TH']

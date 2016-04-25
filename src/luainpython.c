@@ -34,8 +34,8 @@
 #include "luainpython.h"
 
 // Torch related includes
-#include "TH/TH.h"
 #include "luaT.h"
+#include "TH.h"
 
 lua_State *LuaState = NULL;
 
