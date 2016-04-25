@@ -678,6 +678,10 @@ PyMODINIT_FUNC PyInit_lua(void)
         luaL_openlibs(LuaState);
         luaopen_python(LuaState);
         lua_settop(LuaState, 0);
+        // Always require torch
+        lua_getglobal(LuaState, "require");
+        lua_pushstring(LuaState, "torch");
+        lua_pcall(LuaState, 1, LUA_MULTRET, 0);
     }
 
 #if PY_MAJOR_VERSION >= 3
