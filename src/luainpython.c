@@ -20,6 +20,8 @@
  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
+#define _GNU_SOURCE
+#include <dlfcn.h>
 #include <Python.h>
 
 /* need this to build with Lua 5.2: enables lua_strlen() macro */
@@ -621,8 +623,41 @@ static struct PyModuleDef lua_module = {
 };
 #endif
 
+PyMODINIT_FUNC PyInit_lua(void);
+
+// This module loads libpython.so, which needs to be made available for
+// resolution to numpy's internal modules (multiarray.so does not have a
+// DT_NEEDED dependency on libpython.so). The trouble is that LuaJIT loads C
+// extensions with RTLD_LOCAL and there's no easy way to override that, so
+// symbols from this module (and its dependencies) are not available to
+// numpy's internal modules.
+//
+// We fix this by reloading the current module with RTLD_GLOBAL. Note the
+// RTLD_NOLOAD flag; we'll fail if the library isn't already loaded (which
+// would mean we're doing something stupid).
+void reloadGlobal(void) {
+    Dl_info info;
+    // Yes, dladdr returns non-zero on success...
+    if (!dladdr(&PyInit_lua, &info) || !info.dli_fname) {
+        printf("Unable to locate path.\n");
+        exit(1);
+    }
+    void* self = dlopen(info.dli_fname, RTLD_LAZY | RTLD_NOLOAD | RTLD_GLOBAL);
+    if (!self) {
+        printf("Unable to export symbols.\n");
+        exit(1);
+    }
+    // ... but dlclose returns zero on success.
+    if (dlclose(self)) {
+        printf("Unable to realease reference.\n");
+        exit(1);
+    }
+}
+
 PyMODINIT_FUNC PyInit_lua(void)
 {
+    reloadGlobal();
+
     PyObject *m;
 
 #if PY_MAJOR_VERSION >= 3
