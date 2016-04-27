@@ -30,6 +30,7 @@
 
 #include "pythoninlua.h"
 #include "luainpython.h"
+#include "AllocatorForArray.h"
 
 // Torch related includes
 #include "luaT.h"

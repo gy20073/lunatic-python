@@ -34,6 +34,7 @@
 
 #include "pythoninlua.h"
 #include "luainpython.h"
+#include "AllocatorForArray.h"
 
 // Torch related includes
 #include "luaT.h"
@@ -671,6 +672,8 @@ PyMODINIT_FUNC PyInit_lua(void)
         lua_getglobal(LuaState, "require");
         lua_pushstring(LuaState, "torch");
         lua_pcall(LuaState, 1, LUA_MULTRET, 0);
+        // Initialize our allocators
+        allocForArrayInit();
     }
 
 #if PY_MAJOR_VERSION >= 3

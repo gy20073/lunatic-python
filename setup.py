@@ -80,10 +80,10 @@ inside Python, and so on.
 """,
       ext_modules=[
         Extension("lua-python",
-                  ["src/pythoninlua.c", "src/luainpython.c"],
+                  ["src/pythoninlua.c", "src/luainpython.c", "src/AllocatorForArray.c"],
                   **lua_pkgconfig),
         Extension("lua",
-                  ["src/pythoninlua.c", "src/luainpython.c"],
+                  ["src/pythoninlua.c", "src/luainpython.c", "src/AllocatorForArray.c"],
                   **lua_pkgconfig),
         ],
       )

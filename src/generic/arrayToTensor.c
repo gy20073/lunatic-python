@@ -2,11 +2,14 @@
 
 case NUMPY_TYPE:
 {
+
     // TODO prevents python's GC from ever deleting the array until the storage is freed
     // Should use newWithDataAndAllocator
-    THStorage *storage = THStorage_(newWithData)(
+    THStorage *storage = THStorage_(newWithDataAndAllocator)(
         PyArray_DATA(arrObj),
-        PyArray_NBYTES(arrObj) / sizeof(real));
+        PyArray_NBYTES(arrObj) / sizeof(real),
+        getAllocForArray(),
+        (void*) arrObj);
 
     if (PyArray_SIZE(arrObj) != 0) {
         int ndims = PyArray_NDIM(arrObj);
