@@ -14,15 +14,13 @@ THAllocator* getAllocForArray(void) {
 }
 
 void* npy_malloc(void* ctx, long size) {
-    printf("Tried to allocate memory on a Tensor created from a Numpy array.\n");
     // We need to fail here since Torch does not check the return of malloc
-    exit(1);
+    luaL_error(LuaState, "Tried to allocate memory on a Tensor created from a Numpy array.");
     return NULL;
 }
 void* npy_realloc(void* ctx, void* ptr, long size) {
-    printf("Tried to reallocate memory on a Tensor created from a Numpy array.\n");
     // We need to fail here since Torch does not check the return of realloc
-    exit(1);
+    luaL_error(LuaState, "Tried to reallocate memory on a Tensor created from a Numpy array.");
     return NULL;
 }
 void npy_free(void* ctx, void* ptr) {

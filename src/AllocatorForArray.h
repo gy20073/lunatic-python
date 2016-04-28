@@ -2,9 +2,15 @@
 #define ALLOCATORFORARRAY_H
 
 #include "TH.h"
+
+#include "lua.h"
+#include "lualib.h"
+
 #include <Python.h>
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/arrayobject.h>
+
+#include "luainpython.h"
 
 void allocForArrayInit(void);
 THAllocator* getAllocForArray(void);

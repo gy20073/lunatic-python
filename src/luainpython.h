@@ -42,4 +42,6 @@ extern lua_State *LuaState;
 #endif
 PyMODINIT_FUNC PyInit_lua(void);
 
+extern lua_State *LuaState;
+
 #endif
