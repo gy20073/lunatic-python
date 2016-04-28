@@ -6,7 +6,6 @@
     THStorage* storage = luaT_toudata(LuaState, -1, torch_Storage);
     if (storage) {
       THStorage_(setFlag)(storage, TH_STORAGE_RESIZABLE);
-      //printf("Releasing the underlying storage\n");
     }
 }
 

@@ -4,7 +4,6 @@
 
 // Short and Char types have been removed
 // Added a define NUMPY_TYPE for the corresponding numpy object
-// and torch_Tensor that is not defined in TH
 
 #define real unsigned char
 #define accreal long

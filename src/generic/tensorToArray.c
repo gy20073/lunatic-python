@@ -8,6 +8,7 @@
     // Can we work with the given storage?
     THStorage* storage = THTensor_(storage)(tensor);
     if ((storage->flag & TH_STORAGE_RESIZABLE)==0) {
+      // Should this be a python error ?
       printf("Trying to create an array from an unresizable tensor. Abording.\n");
       break;
     }

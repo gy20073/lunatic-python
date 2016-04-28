@@ -26,7 +26,6 @@ void* npy_realloc(void* ctx, void* ptr, long size) {
 void npy_free(void* ctx, void* ptr) {
     PyArrayObject *arr = (PyArrayObject *)ctx;
     // We want this to fail if the reference is incorrect
-    // printf("Releasing the np array associated to the tensor.\n");
     Py_DECREF(arr);
 }
 
