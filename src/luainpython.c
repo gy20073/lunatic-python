@@ -228,6 +228,12 @@ static PyObject *LuaObject_New(int n)
 
 static void LuaObject_dealloc(LuaObject *self)
 {
+    // Handle torch storages and decrement them properly
+    lua_rawgeti(LuaState, LUA_REGISTRYINDEX, self->ref);
+    #define TH_GENERIC_FILE "generic/deallocStorage.c"
+    #include "THGenerateAllTypes.h"
+    lua_pop(LuaState, 1);
+
     luaL_unref(LuaState, LUA_REGISTRYINDEX, self->ref);
     if (self->refiter)
         luaL_unref(LuaState, LUA_REGISTRYINDEX, self->refiter);

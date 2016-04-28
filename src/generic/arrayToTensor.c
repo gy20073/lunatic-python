@@ -4,8 +4,11 @@
 case NUMPY_TYPE:
 {
 
-    // TODO prevents python's GC from ever deleting the array until the storage is freed
-    // Should use newWithDataAndAllocator
+    // We need to have a specific allocator for our storage that will
+    // prevent the modification of the underlying array.
+    // The numpy array will not be freed not resisable since we have
+    // a reference to it. This ref will be freed in the allocator when
+    // the tensor will be freed.
     THStorage *storage = THStorage_(newWithDataAndAllocator)(
         PyArray_DATA(arrObj),
         PyArray_NBYTES(arrObj) / sizeof(real),

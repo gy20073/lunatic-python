@@ -8,7 +8,7 @@
     // Can we work with the given storage?
     THStorage* storage = THTensor_(storage)(tensor);
     if ((storage->flag & TH_STORAGE_RESIZABLE)==0) {
-      printf("Trying to create an array from a fixed tensor. Abording.\n");
+      printf("Trying to create an array from an unresizable tensor. Abording.\n");
       break;
     }
 
@@ -43,9 +43,10 @@
         stridesPtr, THTensor_(data)(tensor), 0,
         NPY_ARRAY_ALIGNED, NULL);
 
-    // Numpy will prevent any resizing of the underlying storage
-    // The storage will not be released since we have a ref to the storage
-    // that will exist until this numpy array exists
+    // Numpy will prevent the resizing of the array since it has a base object.
+    // The torch storage will not be released since we have a ref to it
+    // that will exist until this numpy array exists.
+    THStorage_(clearFlag)(storage, TH_STORAGE_RESIZABLE);
     LuaObject *luaObj = PyObject_New(LuaObject, &LuaObject_Type);
     THStorage_(retain)(storage);
     luaT_pushudata(LuaState, storage, torch_Storage);
