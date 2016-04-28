@@ -33,7 +33,7 @@ Will look into adding it again soon.
 | lua bool | python bool |
 | torch DoubleTensor | double ndarray |
 | torch FloatTensor | float ndarray |
-| torch Tensor (Long, Int, Byte) | (int64, int32, int8) ndarray |
+| torch {Long, Int, Byte}Tensor | (int64, int32, int8) ndarray |
 | Other | LuaObject* |
 
 * LuaObject is a generic python wrapper for any lua object. It can contain any lua userdata, lightuserdata, table, function or thread object. It allows:
@@ -42,3 +42,10 @@ Will look into adding it again soon.
     * get and set attributes if the underlying lua object supports it
     * you can iterate on it if the underlying lua object supports it (tables)
     * you can use the `lua.toDict()` and `lua.toTable()` functions to change between a python dictionnary and a lua table (that is handled as a LuaObject)
+
+#### Tests
+
+The following tests script are provided:
+* `test.py` shows the main features for standard types, table/dict correspondances and tensor/ndarray correspondances.
+* `arrayToTensorTest.py` tests if the tensor created from numpy arrays behave as expected: they do share the same data, the ndarray is properly refcounted, you can never resize the tensor and the ndarray can only be resized after the tensor has been freed.
+* `tensorToArray.py` tests if the ndarray created from torch tensors behave as expected: they do share the same data, the storage associated with the original tensor is properly refcounted, you can never resize the ndarray and the tensor and the storage can only be resized after the ndarray has been freed.
