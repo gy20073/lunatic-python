@@ -1,8 +1,17 @@
 // This file will be included by THGenerateAllTypes
+#define torch_Tensor TH_CONCAT_STRING_3(torch.,Real,Tensor)
+#define torch_Storage TH_CONCAT_STRING_3(torch.,Real,Storage)
 
 {
   THTensor *tensor = luaT_toudata(L, n, torch_Tensor);
   if (tensor) {
+    // Can we work with the given storage?
+    THStorage* storage = THTensor_(storage)(tensor);
+    if ((storage->flag & TH_STORAGE_RESIZABLE)==0) {
+      printf("Trying to create an array from a fixed tensor. Abording.\n");
+      break;
+    }
+
     int ndims;
     npy_intp zero = 0;
     npy_intp* dimsPtr;
@@ -34,8 +43,18 @@
         stridesPtr, THTensor_(data)(tensor), 0,
         NPY_ARRAY_ALIGNED, NULL);
 
-    // TODO prevents lua's GC from ever deleting the storage
-    // Should use PyArray_SetBaseObject to take care of the lua ref counting
+    // Numpy will prevent any resizing of the underlying storage
+    // The storage will not be released since we have a ref to the storage
+    // that will exist until this numpy array exists
+    LuaObject *luaObj = PyObject_New(LuaObject, &LuaObject_Type);
+    THStorage_(retain)(storage);
+    luaT_pushudata(LuaState, storage, torch_Storage);
+    luaObj->ref = luaL_ref(LuaState, LUA_REGISTRYINDEX);
+    luaObj->refiter = 0;
+    int r = PyArray_SetBaseObject((PyArrayObject*)ret, (PyObject*)luaObj);
+    if(r) {
+      printf("Error linking the Tensor to the numpy array.\n");
+    }
 
     if(dimsPtr) {
       free(dimsPtr);
@@ -46,3 +65,6 @@
     break;
   }
 }
+
+#undef torch_Tensor
+#undef torch_Storage

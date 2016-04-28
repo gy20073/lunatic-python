@@ -1,4 +1,5 @@
 // This file will be included by THGenerateAllTypes
+#define torch_Tensor TH_CONCAT_STRING_3(torch.,Real,Tensor)
 
 case NUMPY_TYPE:
 {
@@ -50,3 +51,5 @@ case NUMPY_TYPE:
     ret = 1;
     break;
 }
+
+#undef torch_Tensor

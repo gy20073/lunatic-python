@@ -11,7 +11,6 @@
 #define Real Byte
 #define NUMPY_TYPE NPY_UINT8
 #define TH_REAL_IS_BYTE
-#define torch_Tensor TH_CONCAT_STRING_3(torch.,Real,Tensor)
 #line 1 TH_GENERIC_FILE
 #include TH_GENERIC_FILE
 #undef real
@@ -25,7 +24,6 @@
 #define Real Int
 #define NUMPY_TYPE NPY_UINT32
 #define TH_REAL_IS_INT
-#define torch_Tensor TH_CONCAT_STRING_3(torch.,Real,Tensor)
 #line 1 TH_GENERIC_FILE
 #include TH_GENERIC_FILE
 #undef real
@@ -39,7 +37,6 @@
 #define Real Long
 #define NUMPY_TYPE NPY_UINT64
 #define TH_REAL_IS_LONG
-#define torch_Tensor TH_CONCAT_STRING_3(torch.,Real,Tensor)
 #line 1 TH_GENERIC_FILE
 #include TH_GENERIC_FILE
 #undef real
@@ -53,7 +50,6 @@
 #define Real Float
 #define NUMPY_TYPE NPY_FLOAT
 #define TH_REAL_IS_FLOAT
-#define torch_Tensor TH_CONCAT_STRING_3(torch.,Real,Tensor)
 #line 1 TH_GENERIC_FILE
 #include TH_GENERIC_FILE
 #undef real
@@ -67,7 +63,6 @@
 #define Real Double
 #define NUMPY_TYPE NPY_DOUBLE
 #define TH_REAL_IS_DOUBLE
-#define torch_Tensor TH_CONCAT_STRING_3(torch.,Real,Tensor)
 #line 1 TH_GENERIC_FILE
 #include TH_GENERIC_FILE
 #undef real
