@@ -678,6 +678,7 @@ PyMODINIT_FUNC PyInit_lua(void)
         lua_getglobal(LuaState, "require");
         lua_pushstring(LuaState, "torch");
         lua_pcall(LuaState, 1, LUA_MULTRET, 0);
+        lua_pop(LuaState, 1);
         // Initialize our allocators
         allocForArrayInit();
     }
