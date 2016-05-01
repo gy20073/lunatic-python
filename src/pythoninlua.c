@@ -575,20 +575,19 @@ void initNumpy(void) {
     import_array();
 }
 
-LUA_API int luaopen_python(lua_State *L)
+LUA_API int luaopen_liblpython(lua_State *L)
 {
     // import_array cannot be called here because it return nothing on error
     // and this function is supposed to return an int
-    initNumpy();
     int rc;
 
-    /* Register module */
-    luaL_register(L, "python", py_lib);
+    /* Register module in a local table*/
+    lua_newtable(L);
+    luaL_register(L, NULL, py_lib);
 
     /* Register python object metatable */
     luaL_newmetatable(L, POBJECT);
     luaL_register(L, NULL, py_object_lib);
-    lua_pop(L, 1);
 
     /* Initialize Lua state in Python territory */
     if (!LuaState) LuaState = L;
@@ -620,6 +619,7 @@ LUA_API int luaopen_python(lua_State *L)
             }
         }
     }
+    initNumpy();
 
     /* Register 'none' */
     lua_pushliteral(L, "Py_None");
@@ -629,10 +629,11 @@ LUA_API int luaopen_python(lua_State *L)
         lua_pushvalue(L, -2);
         lua_rawset(L, -5); /* python.none */
         lua_rawset(L, LUA_REGISTRYINDEX); /* registry.Py_None */
+        lua_pop(L, 1);
     } else {
         lua_pop(L, 1);
         luaL_error(L, "failed to convert none object");
     }
 
-    return 0;
+    return 1;
 }

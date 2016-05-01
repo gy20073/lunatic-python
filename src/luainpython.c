@@ -672,7 +672,7 @@ PyMODINIT_FUNC PyInit_lua(void)
     if (!LuaState) {
         LuaState = luaL_newstate();
         luaL_openlibs(LuaState);
-        luaopen_python(LuaState);
+        luaopen_liblpython(LuaState);
         lua_settop(LuaState, 0);
         // Always require torch
         lua_getglobal(LuaState, "require");

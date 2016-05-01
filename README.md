@@ -8,9 +8,10 @@ It adds the possibility to easily exchange [numpy ndarray](http://docs.scipy.org
 
 #### Installing
 You need to install [torch](http://torch.ch/docs/getting-started.html#_) and numpy.
-Then you can just install with: `python setup.py install`
 
 #### Python `lua` module
+You can install the python module with: `python setup.py install`
+
 The module is composed of a basic interface:
 * `lua.execute(code_string)` that execute the string given in the lua space
 * `lua.eval(code_string)` that execute the string given in the lua space and returns the value
@@ -19,9 +20,18 @@ The module is composed of a basic interface:
 * `lua.toDict(table)` convert the given lua table (represented as a LuaObject see below) into a python dictionnary
 * `lua.toTable(dict)` convert the given python dictionnary into a lua table (represented as a LuaObject see below)
 
-#### Lua `python` module
-Not supported right now since it has been removed in the original github repo.
-Will look into adding it again soon.
+#### Lua `lpython` module
+You can install the lua module with: `luarocks make`
+
+The module is composed of a basic interface:
+* `lpython.execute(code_string)` that execute the string given in python space
+* `lpython.eval(code_string)` that execute the string given in the python space and returns the value
+* `lpython.globals()` returns a dict to all the globals of the python space. Can be used to access or add elements to python `globals()`
+* `lpython.locals()` returns a dict to all the locals of the python space.
+* `lpython.import(module_string)` performs a python import on the given module and returns the module.
+* `lpython.builtins()` return the dict of builtins.
+* `lpython.asfunc()` Convert a python function to a lua function.
+* `lpython.asattr()` and `lpython.asindx()` Convert a python object to a lua object.
 
 #### Data type correspondance
 

@@ -1,32 +1,16 @@
-cmake_minimum_required(VERSION 2.8.12)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.6 FATAL_ERROR)
+CMAKE_POLICY(VERSION 2.6)
 
-set(CMAKE_BUILD_TYPE_INIT "Release")
-set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
-set(LIBRARY_OUTPUT_PATH ${EXECUTABLE_OUTPUT_PATH})
-
-project(Lunatic)
-
-find_package(Lua 5.2 REQUIRED)
+FIND_PACKAGE(Torch REQUIRED)
 find_package(PythonLibs REQUIRED)
 
-include_directories(${LUA_INCLUDE_DIR})
 include_directories(${PYTHON_INCLUDE_DIR})
 
-add_subdirectory(src)
+file(GLOB src src/*.c)
+SET(luasrc "lpython.lua")
 
-add_library(python MODULE $<TARGET_OBJECTS:src>)
-set_target_properties(python PROPERTIES 
-                             PREFIX "")
+ADD_TORCH_PACKAGE(lpython "${src}" "${luasrc}")
 
-add_library(lua MODULE $<TARGET_OBJECTS:src>)
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-  set_target_properties(lua PROPERTIES 
-                            PREFIX ""
-                            SUFFIX ".pyd")
-else ()
-  set_target_properties(lua PROPERTIES 
-                            PREFIX "")
-endif ()
-
-target_link_libraries(lua ${LUA_LIBRARIES} ${PYTHON_LIBRARIES})
-target_link_libraries(python ${LUA_LIBRARIES} ${PYTHON_LIBRARIES})
+# Link with the appropriate libraries for the C code
+# TH because we use Tensors in our code
+TARGET_LINK_LIBRARIES(lpython TH luaT ${PYTHON_LIBRARIES})
