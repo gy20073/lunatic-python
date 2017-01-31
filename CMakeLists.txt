@@ -2,11 +2,13 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6 FATAL_ERROR)
 CMAKE_POLICY(VERSION 2.6)
 
 FIND_PACKAGE(Torch REQUIRED)
-find_package(PythonLibs REQUIRED)
+FIND_PACKAGE(PythonLibs 2.7 REQUIRED)
+FIND_PACKAGE(PythonInterp 2.7 REQUIRED)
+include(cmake/FindNumpy.cmake)
 
-include_directories(${PYTHON_INCLUDE_DIR})
+INCLUDE_DIRECTORIES(${PYTHON_INCLUDE_DIR} ${NUMPY_INCLUDE_DIR})
 
-file(GLOB src src/*.c)
+FILE(GLOB src src/*.c)
 SET(luasrc "lpython.lua")
 
 ADD_TORCH_PACKAGE(lpython "${src}" "${luasrc}")
