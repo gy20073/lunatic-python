@@ -9,7 +9,7 @@ include(cmake/FindNumpy.cmake)
 INCLUDE_DIRECTORIES(${PYTHON_INCLUDE_DIR} ${NUMPY_INCLUDE_DIR})
 
 FILE(GLOB src src/*.c)
-SET(luasrc "lpython.lua")
+SET(luasrc "init.lua")
 
 ADD_TORCH_PACKAGE(lpython "${src}" "${luasrc}")
 
