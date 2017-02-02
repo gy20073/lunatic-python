@@ -635,5 +635,8 @@ LUA_API int luaopen_liblpython(lua_State *L)
         luaL_error(L, "failed to convert none object");
     }
 
+    // Initialize our allocators
+    allocForArrayInit();
+
     return 1;
 }

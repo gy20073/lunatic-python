@@ -27,6 +27,8 @@ typedef struct {
     PyObject_HEAD
     int ref;
     int refiter;
+    // For tensor storage
+    int was_resizable;
 } LuaObject;
 
 extern PyTypeObject LuaObject_Type;

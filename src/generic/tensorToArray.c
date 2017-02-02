@@ -7,11 +7,6 @@
   if (tensor) {
     // Can we work with the given storage?
     THStorage* storage = THTensor_(storage)(tensor);
-    if ((storage->flag & TH_STORAGE_RESIZABLE)==0) {
-      // Should this be a python error ?
-      printf("Trying to create an array from an unresizable tensor. Abording.\n");
-      break;
-    }
 
     int ndims;
     npy_intp zero = 0;
@@ -47,13 +42,22 @@
     // Numpy will prevent the resizing of the array since it has a base object.
     // The torch storage will not be released since we have a ref to it
     // that will exist until this numpy array exists.
-    THStorage_(clearFlag)(storage, TH_STORAGE_RESIZABLE);
     LuaObject *luaObj = PyObject_New(LuaObject, &LuaObject_Type);
     THStorage_(retain)(storage);
     luaT_pushudata(LuaState, storage, torch_Storage);
     luaObj->ref = luaL_ref(LuaState, LUA_REGISTRYINDEX);
     luaObj->refiter = 0;
+
+    if ((storage->flag & TH_STORAGE_RESIZABLE)==0) {
+      // This storage was not originaly resizable
+      luaObj->was_resizable = 0;
+    } else {
+      luaObj->was_resizable = 1;
+      THStorage_(clearFlag)(storage, TH_STORAGE_RESIZABLE);
+    }
+
     int r = PyArray_SetBaseObject((PyArrayObject*)ret, (PyObject*)luaObj);
+
     if(r) {
       printf("Error linking the Tensor to the numpy array.\n");
     }

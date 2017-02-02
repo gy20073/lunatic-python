@@ -4,7 +4,7 @@
 
 {
     THStorage* storage = luaT_toudata(LuaState, -1, torch_Storage);
-    if (storage) {
+    if (storage && self->was_resizable==1) {
       THStorage_(setFlag)(storage, TH_STORAGE_RESIZABLE);
     }
 }
