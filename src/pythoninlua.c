@@ -42,6 +42,7 @@
 #include <numpy/arrayobject.h>
 
 static int py_asfunc_call(lua_State *L);
+PyObject* py_kw_to_dict(lua_State *L, int n);
 
 static int py_convert_custom(lua_State *L, PyObject *o, int asindx)
 {
@@ -56,6 +57,26 @@ static int py_convert_custom(lua_State *L, PyObject *o, int asindx)
         ret = 1;
     } else {
         luaL_error(L, "failed to allocate userdata object");
+    }
+    return ret;
+}
+
+static int py_kw_new(lua_State *L)
+{
+    int ret = 0;
+    PyObject* dict = convertDictFromTable(L, 1);
+    if (dict) {
+        py_kw *obj = (py_kw*) lua_newuserdata(L, sizeof(py_kw));
+        if (obj) {
+            obj->o = dict;
+            luaL_getmetatable(L, PKWARG);
+            lua_setmetatable(L, -2);
+            ret = 1;
+        } else {
+            luaL_error(L, "failed to allocate userdata object");
+        }
+    } else {
+        luaL_error(L, "keyword arguments can only be build from table");
     }
     return ret;
 }
@@ -132,6 +153,7 @@ int py_convert(lua_State *L, PyObject *o, int withnone)
 static int py_object_call(lua_State *L)
 {
     py_object *obj = (py_object*) luaL_checkudata(L, 1, POBJECT);
+    PyObject *kw = NULL;
     PyObject *args;
     PyObject *value;
     int nargs = lua_gettop(L)-1;
@@ -151,7 +173,23 @@ static int py_object_call(lua_State *L)
         return luaL_error(L, "failed to create arguments tuple");
     }
 
+    int kw_found = 0;
     for (i = 0; i != nargs; i++) {
+        // Check if keyword argument
+        int type = lua_type(L, i+2);
+        if(type == LUA_TUSERDATA) {
+            PyObject* dict = py_kw_to_dict(L, i+2);
+            if(dict) {
+                if(kw) {
+                    return luaL_error(L, "Only one keyword object can be provided");
+                } else {
+                    kw = dict;
+                }
+                ++kw_found;
+                continue;
+            }
+        }
+
         PyObject *arg = LuaConvert(L, i+2);
         if (!arg) {
             Py_DECREF(args);
@@ -159,8 +197,13 @@ static int py_object_call(lua_State *L)
         }
         PyTuple_SetItem(args, i, arg);
     }
+    if (kw_found) {
+        _PyTuple_Resize(&args, nargs-kw_found);
+    }
 
-    value = PyObject_CallObject(obj->o, args);
+    value = PyObject_Call(obj->o, args, kw);
+    Py_DECREF(args);
+
     if (value) {
         ret = py_convert(L, value, 0);
         Py_DECREF(value);
@@ -172,7 +215,7 @@ static int py_object_call(lua_State *L)
     return ret;
 }
 
-static int _p_object_newindex_set(lua_State *L, py_object *obj,
+static int _p_object_newindex_set(lua_State *L, PyObject *obj,
                   int keyn, int valuen)
 {
     PyObject *value;
@@ -189,14 +232,14 @@ static int _p_object_newindex_set(lua_State *L, py_object *obj,
             return luaL_argerror(L, 1, "failed to convert value");
         }
 
-        if (PyObject_SetItem(obj->o, key, value) == -1) {
+        if (PyObject_SetItem(obj, key, value) == -1) {
             PyErr_Print();
             luaL_error(L, "failed to set item");
         }
 
         Py_DECREF(value);
     } else {
-        if (PyObject_DelItem(obj->o, key) == -1) {
+        if (PyObject_DelItem(obj, key) == -1) {
             PyErr_Print();
             luaL_error(L, "failed to delete item");
         }
@@ -213,7 +256,7 @@ static int py_object_newindex_set(lua_State *L)
     if (lua_gettop(L) != 2) {
         return luaL_error(L, "invalid arguments");
     }
-    return _p_object_newindex_set(L, obj, 1, 2);
+    return _p_object_newindex_set(L, obj->o, 1, 2);
 }
 
 static int py_object_newindex(lua_State *L)
@@ -227,7 +270,7 @@ static int py_object_newindex(lua_State *L)
     }
 
     if (obj->asindx)
-        return _p_object_newindex_set(L, obj, 2, 3);
+        return _p_object_newindex_set(L, obj->o, 2, 3);
 
     attr = luaL_checkstring(L, 2);
     if (!attr) {
@@ -249,7 +292,20 @@ static int py_object_newindex(lua_State *L)
     return 0;
 }
 
-static int _p_object_index_get(lua_State *L, py_object *obj, int keyn)
+static int py_kw_newindex(lua_State *L)
+{
+    py_kw *obj = (py_kw*) luaL_checkudata(L, 1, PKWARG);
+    const char *attr;
+    PyObject *value;
+
+    if (!obj) {
+        return luaL_argerror(L, 1, "not a keyword object");
+    }
+
+    return _p_object_newindex_set(L, obj->o, 2, 3);
+}
+
+static int _p_object_index_get(lua_State *L, PyObject *obj, int keyn)
 {
     PyObject *key = LuaConvert(L, keyn);
     PyObject *item;
@@ -259,7 +315,7 @@ static int _p_object_index_get(lua_State *L, py_object *obj, int keyn)
         return luaL_argerror(L, 1, "failed to convert key");
     }
 
-    item = PyObject_GetItem(obj->o, key);
+    item = PyObject_GetItem(obj, key);
 
     Py_DECREF(key);
 
@@ -285,7 +341,7 @@ static int py_object_index_get(lua_State *L)
     if (top < 1 || top > 2) {
         return luaL_error(L, "invalid arguments");
     }
-    return _p_object_index_get(L, obj, 1);
+    return _p_object_index_get(L, obj->o, 1);
 }
 
 static int py_object_index(lua_State *L)
@@ -300,7 +356,7 @@ static int py_object_index(lua_State *L)
     }
 
     if (obj->asindx)
-        return _p_object_index_get(L, obj, 2);
+        return _p_object_index_get(L, obj->o, 2);
 
     attr = luaL_checkstring(L, 2);
     if (!attr) {
@@ -330,9 +386,32 @@ static int py_object_index(lua_State *L)
     return ret;
 }
 
+static int py_kw_index(lua_State *L)
+{
+    py_kw *obj = (py_kw*) luaL_checkudata(L, 1, PKWARG);
+    const char *attr;
+    PyObject *value;
+    int ret = 0;
+
+    if (!obj) {
+        return luaL_argerror(L, 1, "not a keyword object");
+    }
+
+    return _p_object_index_get(L, obj->o, 2);
+}
+
 static int py_object_gc(lua_State *L)
 {
     py_object *obj = (py_object*) luaL_checkudata(L, 1, POBJECT);
+    if (obj) {
+        Py_DECREF(obj->o);
+    }
+    return 0;
+}
+
+static int py_kw_gc(lua_State *L)
+{
+    py_kw *obj = (py_kw*) luaL_checkudata(L, 1, PKWARG);
     if (obj) {
         Py_DECREF(obj->o);
     }
@@ -358,12 +437,36 @@ static int py_object_tostring(lua_State *L)
     return 1;
 }
 
+static int py_kw_tostring(lua_State *L)
+{
+    py_kw *obj = (py_kw*) luaL_checkudata(L, 1, PKWARG);
+    if (obj) {
+        PyObject *repr = PyObject_Str(obj->o);
+        if (repr) {
+            py_convert(L, repr, 0);
+            assert(lua_type(L, -1) == LUA_TSTRING);
+            Py_DECREF(repr);
+        } else {
+            luaL_error(L, "python keyword object cannot be represented as a string");
+        }
+    }
+    return 1;
+}
+
 static const luaL_Reg py_object_lib[] = {
     {"__call",  py_object_call},
     {"__index", py_object_index},
     {"__newindex",  py_object_newindex},
     {"__gc",    py_object_gc},
     {"__tostring",  py_object_tostring},
+    {NULL, NULL}
+};
+
+static const luaL_Reg py_kw_lib[] = {
+    {"__index", py_kw_index},
+    {"__newindex",  py_kw_newindex},
+    {"__gc",    py_kw_gc},
+    {"__tostring",  py_kw_tostring},
     {NULL, NULL}
 };
 
@@ -558,6 +661,19 @@ py_object* luaPy_to_pobject(lua_State *L, int n)
     return is_pobject ? (py_object *) lua_touserdata(L, n) : NULL;
 }
 
+PyObject* py_kw_to_dict(lua_State *L, int n)
+{
+    if(!lua_getmetatable(L, n)) return NULL;
+    luaL_getmetatable(L, PKWARG);
+    int is_pkw = lua_rawequal(L, -1, -2);
+    lua_pop(L, 2);
+
+    py_kw *obj = (py_kw *) lua_touserdata(L, n);
+
+
+    return is_pkw ? obj->o : NULL;
+}
+
 static const luaL_Reg py_lib[] = {
     {"execute", py_execute},
     {"eval",    py_eval},
@@ -568,6 +684,7 @@ static const luaL_Reg py_lib[] = {
     {"globals", py_globals},
     {"builtins",    py_builtins},
     {"import",  py_import},
+    {"kw",      py_kw_new},
     {NULL, NULL}
 };
 
@@ -588,6 +705,11 @@ LUA_API int luaopen_liblpython(lua_State *L)
     /* Register python object metatable */
     luaL_newmetatable(L, POBJECT);
     luaL_register(L, NULL, py_object_lib);
+
+    /* Register python object metatable */
+    luaL_newmetatable(L, PKWARG);
+    luaL_register(L, NULL, py_kw_lib);
+    lua_pop(L, 1);
 
     /* Initialize Lua state in Python territory */
     if (!LuaState) LuaState = L;
@@ -634,6 +756,9 @@ LUA_API int luaopen_liblpython(lua_State *L)
         lua_pop(L, 1);
         luaL_error(L, "failed to convert none object");
     }
+
+    // Initialize our allocators
+    allocForArrayInit();
 
     return 1;
 }

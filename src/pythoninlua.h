@@ -24,6 +24,7 @@
 #define PYTHONINLUA_H
 
 #define POBJECT "POBJECT"
+#define PKWARG "PKWARG"
 
 int py_convert(lua_State *L, PyObject *o, int withnone);
 
@@ -31,6 +32,10 @@ typedef struct {
     PyObject *o;
     int asindx;
 } py_object;
+
+typedef struct {
+    PyObject *o;
+} py_kw;
 
 py_object* luaPy_to_pobject(lua_State *L, int n);
 LUA_API int luaopen_liblpython(lua_State *L);

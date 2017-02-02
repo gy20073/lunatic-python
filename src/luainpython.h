@@ -34,6 +34,7 @@ extern PyTypeObject LuaObject_Type;
 #define LuaObject_Check(op) PyObject_TypeCheck(op, &LuaObject_Type)
 
 PyObject *LuaConvert(lua_State *L, int n);
+PyObject *convertDictFromTable(lua_State *L, int n);
 
 extern lua_State *LuaState;
 

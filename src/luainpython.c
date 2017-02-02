@@ -196,7 +196,6 @@ PyObject* convertDictFromTable(lua_State* L, int index)
     if(!obj) {
         luaL_error(L, "convertDictFromTable");
     }
-    Py_INCREF(obj);
 
     lua_pushnil(L);
     while (lua_next(L, index) != 0) {

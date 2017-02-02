@@ -30,6 +30,7 @@ The module is composed of a basic interface:
 * `lpython.locals()` returns a dict to all the locals of the python space.
 * `lpython.import(module_string)` performs a python import on the given module and returns the module.
 * `lpython.builtins()` return the dict of builtins.
+* `lpython.kw(table)` convert a table to a keyword argument object that can be used to pass keyword arguments to python functions.
 * `lpython.asfunc()` Convert a python function to a lua function.
 * `lpython.asattr()` and `lpython.asindx()` Convert a python object to a lua object.
 
