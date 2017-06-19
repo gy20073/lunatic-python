@@ -2,6 +2,7 @@
 
 import sys
 import os
+import numpy
 
 if sys.version > '3':
     PY3 = True
@@ -60,6 +61,7 @@ def pkgconfig(*packages):
 lua_pkgconfig = pkgconfig('lua' + LUAVERSION, 'lua' + LUAVERSION,'python-' + PYTHONVERSION)
 lua_pkgconfig['include_dirs'] += [TORCHDIR+'/include']
 lua_pkgconfig['include_dirs'] += [TORCHDIR+'/include/TH']
+lua_pkgconfig['include_dirs'] += [numpy.get_include()]
 lua_pkgconfig['library_dirs'] = [TORCHDIR+'/lib']
 lua_pkgconfig['libraries'] += ['luajit']
 lua_pkgconfig['libraries'] += ['TH']
